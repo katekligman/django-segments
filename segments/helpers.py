@@ -20,9 +20,7 @@ class RedisHelper(object):
     def diff_segment(self, key_1, key_2):
         return self.redis.sdiff(key_1, key_2)
 
-    def export_segment(self, prefix, segment):
-        key = prefix + ':' + segment.slug
-
+    def export_segment(self, key, segment):
         # Remove the stale original if it exists
         self.redis.delete(key)
 
@@ -31,9 +29,7 @@ class RedisHelper(object):
         for id_block in chunk_items(member_ids, 10000):
             self.redis.sadd(key, *set(id_block))
 
-    def export_users(self, prefix, users, segment):
-        key = prefix + ':' + segment.slug
-
+    def export_users(self, key, users):
         # Remove the stale original if it exists
         self.redis.delete(key)
 
