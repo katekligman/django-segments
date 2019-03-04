@@ -10,6 +10,7 @@ def user_table():
 
 class SegmentFactory(factory.DjangoModelFactory):
     name = "Segment 1"
+    slug = factory.Sequence(lambda n: 'slug{0}'.format(n))
 
     class Meta:
         model = models.Segment
@@ -17,6 +18,7 @@ class SegmentFactory(factory.DjangoModelFactory):
 
 class AllUserSegmentFactory(factory.DjangoModelFactory):
     name = "Segment 1"
+    slug = factory.Sequence(lambda n: 'slug{0}'.format(n))
 
     definition = "select * from %s" % user_table()
 

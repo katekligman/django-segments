@@ -151,6 +151,36 @@ class Segment(models.Model):
             self._flush(to_remove)
             SegmentMembership.objects.bulk_create(memberships)
 
+    @live_sql
+    def refresh_with_redis(self):
+        from segments.helpers import RedisHelper
+        r = RedisHelper()
+
+        # Save a temporary copy of the original segment members
+        r.export_segment('old', self)
+
+        users = get_user_model().objects.extra(where=[self.definition.lower().split('where')[1]])
+
+        # Save a temporary copy of the updated segment members
+        r.export_users('new', users, self)
+
+        old_key = 'old:' + self.slug
+        new_key = 'new:' + self.slug
+
+        # Add new segment users
+        adds = r.diff_segment(old_key, new_key)
+        for user in adds:
+            r.enqueue_user_membership_add(user, self)
+
+        # Remove deleted segment users
+        deletes = r.diff_segment(old_key, new_key)
+        for user in deletes:
+            r.enqueue_user_membership_delete(user, self)
+
+        # Cleanup the segment buckets
+        r.cleanup_export(old_key, self)
+        r.cleanup_export(new_key, self)
+
     #################
     # Private methods
     #################

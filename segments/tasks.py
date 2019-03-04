@@ -1,4 +1,6 @@
-from segments.models import Segment, SegmentExecutionError
+from segments.models import Segment, SegmentMembership, SegmentExecutionError
+from segments.helpers import RedisHelper
+from segments import app_settings
 from django.contrib.auth import get_user_model
 from celery import task
 from time import time
@@ -30,14 +32,50 @@ def refresh_segments():
                 % (len(segments)-len(failed), len(failed), end - start))
 
 
-@task(name='segment_refresh')
+@task(name='refresh_segment')
 def refresh_segment(segment_id):
     """Celery task to refresh an individual Segment."""
     try:
         s = Segment.objects.get(pk=segment_id)
-        s.refresh()
+        if app_settings.SEGMENTS_REDIS_URI:
+            s.refresh_with_redis()
+        else:
+            s.refresh()
     except Segment.DoesNotExist:
         logger.exception("SEGMENTS: Unable to refresh segment id %s. DoesNotExist.", segment_id)
+
+
+@task(name='sync_segment_membership_from_redis')
+def sync_segment_membership_from_redis(user_id):
+    r = RedisHelper()
+
+    # Retrieve the sets of added and deleted segments
+    adds = r.redis.smembers('segments:add:' + str(user_id))
+    r.redis.sdel('segments:add:' + str(user_id))
+    deletes = r.redis.smembers('segments:delete:' + str(user_id))
+    r.redis.sdel('segments:delete' + str(user_id))
+
+    # Perform the adds and deletes
+    for add in adds:
+        SegmentMembership(id=add, user_id=user_id).save()
+
+    for delete in deletes:
+        segment = SegmentMembership.objects.filter(id=delete, user_id=user_id)
+        if segment:
+            segment.delete()
+
+    # Save the user to trigger any post-save signal hooks
+    cls = get_user_model()
+    u = cls.objects.get(pk=user_id)
+    u.save()
+
+
+@task(name='refresh_segment_memberships_with_redis')
+def refresh_segment_memberships_with_redis():
+    """Celery task to refresh segment memberships via Redis"""
+    r = RedisHelper()
+    for user_id in r.redis.spop('segments:refresh_memberships'):
+        sync_segment_membership_from_redis.delay(user_id)
 
 
 @task(name='user_segments_refresh')

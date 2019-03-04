@@ -76,6 +76,18 @@ class TestSegment(TestCase):
         s.refresh()
         self.assertEqual(len(s), 1)
 
+    @patch('segments.helpers.redis.StrictRedis')
+    def test_segment_refresh_with_redis(self, mocked_redis):
+        s = AllUserSegmentFactory()
+        UserFactory()
+        self.assertEqual(len(s), 1)
+        s.refresh()
+        self.assertEqual(len(s), 2)
+        s.definition = 'select * from %s where id = %s' % (user_table(), self.u.id)
+        self.assertEqual(len(s), 2)
+        s.refresh_with_redis()
+        mocked_redis.rdiff.assert_called_once()
+
     def test_multiple_segments(self):
         AllUserSegmentFactory()
         s2 = AllUserSegmentFactory()
