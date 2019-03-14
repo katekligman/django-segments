@@ -168,13 +168,13 @@ class Segment(models.Model):
 
         # Add new segment users
         adds = r.diff_segment(new_key, old_key)
-        for user in adds:
-            r.enqueue_user_membership_add(user, self)
+        for user_id in adds:
+            r.enqueue_user_membership_add(user_id, self)
 
         # Remove deleted segment users
         deletes = r.diff_segment(old_key, new_key)
-        for user in deletes:
-            r.enqueue_user_membership_delete(user, self)
+        for user_id in deletes:
+            r.enqueue_user_membership_delete(user_id, self)
 
         # Cleanup the segment buckets
         r.cleanup_export(old_key, self)
