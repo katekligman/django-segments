@@ -53,7 +53,7 @@ def sync_segment_membership_from_redis(user_id):
     adds = r.redis.smembers('segments:add:' + str(user_id))
     r.redis.sdel('segments:add:' + str(user_id))
     deletes = r.redis.smembers('segments:delete:' + str(user_id))
-    r.redis.sdel('segments:delete' + str(user_id))
+    r.redis.sdel('segments:delete:' + str(user_id))
 
     # Perform the adds and deletes
     for add in adds:
